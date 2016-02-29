@@ -6,6 +6,10 @@ import socket
 import time
 import getopt
 import logging
+import logging.handlers
+import signal
+import traceback
+import pdb
 
 from PyQt4.QtCore import Qt
 from PyQt4 import QtCore, QtGui, QtWebKit, QtNetwork
@@ -21,7 +25,7 @@ ANY = "0.0.0.0"
 MCAST_ADDR = "224.168.2.9"
 MCAST_PORT = 1600
 FULLWINDOW = 1
-LOGLEVEL = 10  # debug, 40=error
+LOGLEVEL = logging.DEBUG
 web = None
 VERSION = '0.4.0'
 STARTPAGE = '<html><body style="background-color:#000;color:#fff"></body></html>'
@@ -38,9 +42,21 @@ for item in opts:
     if item[0] == '-l':
         LOGLEVEL = item[1]
 
-logging.basicConfig(filename='mclient.log', level=LOGLEVEL)
-logger = logging.getLogger()
+logger = logging.getLogger (__name__)
+logger.setLevel (LOGLEVEL)
 
+console = logging.StreamHandler()
+console.setLevel(LOGLEVEL)
+formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+console.setFormatter(formatter)
+logger.addHandler(console)
+
+#logfile darf 10 mb gross werden, 10 alte Versionen werden beibehalten
+rotated_logfile = logging.handlers.RotatingFileHandler ('mclient.log', 'a', 10485760, 10)
+rotated_logfile.setLevel(LOGLEVEL)
+rotated_logfile_formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s', '%y-%m-%dT%H:%M:%S')
+rotated_logfile.setFormatter (rotated_logfile_formatter)
+logger.addHandler(rotated_logfile)
 
 def getLastLoad():
     """
@@ -54,6 +70,7 @@ def getLastLoad():
                 if len(ip) == 0:
                     ip = re.findall(r'[0-9]+(?:\.[0-9]+){3}', line.rstrip().split()[-1])
                 if len(ip) > 0:
+                    logger.debug('found last called ip address: %s' % ip[0])
                     return ip[0]
     else:
         return ""
@@ -127,9 +144,11 @@ class AD_Listener(QtCore.QObject):
                         if data[1] == "ping":
                             if ip is None:
                                 self.sock.sendto('{}|initneed'.format(ID), (addr[0], addr[1]))
+                                logger.debug('PING reply initneed no server ip')
                             else:
                                 self.sock.sendto('{}|alive'.format(ID), (addr[0], addr[1]))
-                            logger.debug('PING')
+                                logger.debug('PING reply alive sock.sendto(%s|alive, (%s, %s))' % (format(ID), addr[0], addr[1]))
+
 
                         if data[1] == "changeid":
                             ID = int(data[2])
@@ -140,6 +159,7 @@ class AD_Listener(QtCore.QObject):
                         if data[1] == "getscripts":
                             scripts = [f for f in os.listdir('scripts') if os.path.isfile(os.path.join('scripts', f))]
                             self.sock.sendto('{}|scripts={}'.format(ID, '__'.join(scripts)), (addr[0], addr[1]))
+                            logger.debug('getscripts')
             time.sleep(2)
 
 
@@ -188,7 +208,7 @@ class AD_Window(QtGui.QMainWindow):
         QtCore.QTimer.singleShot(0, self.thread.start)
 
     def signal_received(self, message):
-        logger.debug(QtCore.qVersion())
+        logger.debug('%s - %s' % (QtCore.qVersion(), message))
         try:
             if message == "reset":
                 self.webView.setHtml(self.startpage)
@@ -211,8 +231,22 @@ class AD_Window(QtGui.QMainWindow):
         self.thread.quit()
         self.thread.wait()
 
+    def keyPressEvent(self, event):
+        logger.debug ("keyPressEvent %s %s" % (event.key(), event.modifiers()) )
+        try:
+            #if event.key() == 67 and (event.modifiers() & QtCore.Qt.ControlModifier):
+            if event.key() == 16777249:
+                app.closeAllWindows()
+                sys.exit(0)
+#            else:
+#                logger.debug ("keyPressEvent %s %s" % (event.key(), event.modifiers() & QtCore.Qt.ControlModifier ) )
+        except KeyboardInterrupt:
+            logger.warn ('%s' % traceback.format_exc())
+        QtGui.QMainWindow.keyPressEvent(self,event)
+
 
 if __name__ == "__main__":
+
     app = QtGui.QApplication(sys.argv)
     web = AD_Window()
 
