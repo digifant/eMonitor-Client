@@ -1,10 +1,10 @@
+from optparse import OptionParser
 import sys
 import re
 import os
 import subprocess
 import socket
 import time
-import getopt
 import logging
 import logging.handlers
 import signal
@@ -14,49 +14,6 @@ import pdb
 from PyQt4.QtCore import Qt
 from PyQt4 import QtCore, QtGui, QtWebKit, QtNetwork
 
-try:
-    opts, extraparams = getopt.getopt(sys.argv[1:], 'i:h:p:w')
-except getopt.GetoptError as err:
-    print(err)
-    sys.exit(2)
-
-ID = 0
-ANY = "0.0.0.0"
-MCAST_ADDR = "224.168.2.9"
-MCAST_PORT = 1600
-FULLWINDOW = 1
-LOGLEVEL = logging.DEBUG
-web = None
-VERSION = '0.4.0'
-STARTPAGE = '<html><body style="background-color:#000;color:#fff"></body></html>'
-
-for item in opts:
-    if item[0] == '-i':
-        ID = item[1]
-    if item[0] == '-h':
-        MCAST_ADDR = item[1]
-    if item[0] == '-p':
-        MCAST_PORT = item[1]
-    if item[0] == '-w':
-        FULLWINDOW = 0
-    if item[0] == '-l':
-        LOGLEVEL = item[1]
-
-logger = logging.getLogger (__name__)
-logger.setLevel (LOGLEVEL)
-
-console = logging.StreamHandler()
-console.setLevel(LOGLEVEL)
-formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
-console.setFormatter(formatter)
-logger.addHandler(console)
-
-#logfile darf 10 mb gross werden, 10 alte Versionen werden beibehalten
-rotated_logfile = logging.handlers.RotatingFileHandler ('mclient.log', 'a', 10485760, 10)
-rotated_logfile.setLevel(LOGLEVEL)
-rotated_logfile_formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s', '%y-%m-%dT%H:%M:%S')
-rotated_logfile.setFormatter (rotated_logfile_formatter)
-logger.addHandler(rotated_logfile)
 
 def getLastLoad():
     """
@@ -246,6 +203,41 @@ class AD_Window(QtGui.QMainWindow):
 
 
 if __name__ == "__main__":
+    parser = OptionParser()
+    parser.add_option("-i", "--id", dest="id", help="monitor id",  type="int", default=1)
+    parser.add_option("-f", "--fullscreen", dest="fullscreen", help="start in fullscreen mode",  action='store_true', default=False)
+    parser.add_option("-a", "--maddr", dest="mcast_addr", help="multicast address",  default="224.168.2.9")
+    parser.add_option("-p", "--maport", dest="mcast_port", help="multicast port", type="int", default=1600)
+
+    (options, args) = parser.parse_args()
+
+    ID = options.id
+    ANY = "0.0.0.0"
+    MCAST_ADDR = options.mcast_addr
+    MCAST_PORT = options.mcast_port
+    FULLWINDOW = options.fullscreen
+    LOGLEVEL = logging.DEBUG
+
+    web = None
+    VERSION = '0.4.0'
+    STARTPAGE = '<html><body style="background-color:#000;color:#fff"></body></html>'
+
+    logger = logging.getLogger (__name__)
+    logger.setLevel (LOGLEVEL)
+
+    console = logging.StreamHandler()
+    console.setLevel(LOGLEVEL)
+    formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+    console.setFormatter(formatter)
+    logger.addHandler(console)
+
+    #logfile darf 10 mb gross werden, 10 alte Versionen werden beibehalten
+    rotated_logfile = logging.handlers.RotatingFileHandler ('mclient.log', 'a', 10485760, 10)
+    rotated_logfile.setLevel(LOGLEVEL)
+    rotated_logfile_formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s', '%y-%m-%dT%H:%M:%S')
+    rotated_logfile.setFormatter (rotated_logfile_formatter)
+    logger.addHandler(rotated_logfile)
+
 
     app = QtGui.QApplication(sys.argv)
     web = AD_Window()
@@ -253,7 +245,7 @@ if __name__ == "__main__":
     if not os.path.exists('scripts'):
         os.makedirs('scripts')
 
-    if FULLWINDOW == 1:
+    if FULLWINDOW == True:
         web.setWindowFlags(QtCore.Qt.FramelessWindowHint)
         web.showFullScreen()
     else:
