@@ -92,6 +92,15 @@ class AD_Listener(QtCore.QObject):
                             except:
                                 logger.error('EXECUTE: {}'.format(data[2]))
 
+                        if data[1] == "display_off" or data[1] == "display_on":
+                            c = 'scripts/{}.sh'.format(data[1])
+                            try:
+                                subprocess.check_output(c, stderr=subprocess.STDOUT, shell=True)
+                                logger.debug('display_on/off; execute  %s' % c)
+                            except:
+                                logger.error('display_on/off; execution failed;  %s' % c)
+
+
                         if data[1] == "reset":
                             self.message.emit('reset')
                             self.sock.sendto('{}|reset done'.format(ID), (addr[0], addr[1]))
@@ -216,6 +225,7 @@ if __name__ == "__main__":
     MCAST_ADDR = options.mcast_addr
     MCAST_PORT = options.mcast_port
     FULLWINDOW = options.fullscreen
+    #LOGLEVEL = logging.INFO
     LOGLEVEL = logging.DEBUG
 
     web = None
